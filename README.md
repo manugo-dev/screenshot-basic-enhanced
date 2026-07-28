@@ -49,25 +49,6 @@ different globals and libs — client natives, server natives + Node, and DOM re
 Ambient natives are pulled in by `globals.d.ts` in each target rather than `compilerOptions.types`,
 so the packages resolve the same way in the editor and on the command line.
 
-### How the client registers its exports
-
-The client JS runtime on FiveM Enhanced no longer provides the `exports` global, so `client.ts`
-registers exports the way the runtime itself would. `exports(name, fn)` is only sugar over an
-event: the export system triggers `__cfx_export_<resource>_<name>` with a setter callback, and
-whatever the handler hands to that setter becomes the exported function. So this is equivalent:
-
-```ts
-on(`__cfx_export_${GetCurrentResourceName()}_${name}`, (setCB) => setCB(fn));
-```
-
-Two details worth knowing:
-
-- If a runtime _does_ expose `exports`, that is used instead — the fallback only kicks in when the
-  global is missing.
-- Registration happens under the resource's own name **and** every name it `provide`s (read via
-  `GetResourceMetadata`), so both `exports['screenshot-basic']` and
-  `exports['screenshot-basic-enhanced']` resolve even though the folder is named the latter.
-
 ### Commit conventions
 
 Husky installs two hooks on `npm install`:
