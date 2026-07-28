@@ -33,6 +33,7 @@ module.exports = {
     output: {
         filename: 'client.js',
         path: path.resolve(__dirname, 'dist'),
+        iife: false,
     },
     target: ['web', 'es2020'],
     performance: {

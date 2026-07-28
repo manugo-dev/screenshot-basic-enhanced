@@ -1,4 +1,7 @@
+import { registerExport } from '../shared/export';
+
 RegisterNuiCallbackType('screenshot_created');
+RegisterNuiCallbackType('screenshot_error');
 
 type ResultCallback = (result: string) => void;
 
@@ -15,6 +18,28 @@ function registerCorrelation(cb: ResultCallback) {
     return id;
 }
 
+/**
+ * A capture that failed inside the page.
+ *
+ * The pending callback is settled with an `error:` string rather than left hanging: a caller that
+ * waits forever cannot tell a slow capture from a broken one, and every entry point then looks
+ * equally dead regardless of which part actually failed.
+ */
+on('__cfx_nui:screenshot_error', (body: any, cb: (arg: any) => void) => {
+    cb(true);
+
+    console.log(
+        `screenshot-basic: capture failed — ${body?.error ?? 'unknown error'} (target: ${body?.targetURL ?? 'n/a'})`,
+    );
+
+    if (body?.id !== undefined && results[body.id]) {
+        const resultCb = results[body.id];
+        delete results[body.id];
+
+        resultCb(`error: ${body.error ?? 'capture failed'}`);
+    }
+});
+
 on('__cfx_nui:screenshot_created', (body: any, cb: (arg: any) => void) => {
     cb(true);
 
@@ -25,48 +50,6 @@ on('__cfx_nui:screenshot_created', (body: any, cb: (arg: any) => void) => {
         resultCb(body.data);
     }
 });
-
-// -------------------------------------------------------------------- exports
-
-/**
- * `exports(name, fn)` is sugar over an event: the export system triggers
- * `__cfx_export_<resource>_<name>` with a setter, and whatever the handler passes
- * to that setter becomes the exported function. The client JS runtime on FiveM
- * Enhanced no longer provides the `exports` global, so register that event
- * directly — this is the same thing the runtime would have done for us.
- */
-function registerExport(name: string, fn: (...args: any[]) => void) {
-    const cfxExports = (globalThis as any).exports;
-    cfxExports(name, fn);
-
-    for (const resource of exportNames()) {
-        on(`__cfx_export_${resource}_${name}`, (setCB: (value: typeof fn) => void) => {
-            setCB(fn);
-        });
-    }
-}
-
-/**
- * Names this resource can be addressed by: its own, plus anything it `provide`s,
- * so both `exports['screenshot-basic-enhanced']` and `exports['screenshot-basic']`
- * resolve.
- */
-function exportNames() {
-    const self = GetCurrentResourceName();
-    const names = [self];
-
-    const provided = GetNumResourceMetadata(self, 'provide');
-
-    for (let i = 0; i < provided; i++) {
-        const name = GetResourceMetadata(self, 'provide', i);
-
-        if (name && !names.includes(name)) {
-            names.push(name);
-        }
-    }
-
-    return names;
-}
 
 // ---------------------------------------------------------------- screenshots
 
@@ -108,13 +91,25 @@ function normalize(options: any, cb: ResultCallback): [any, ResultCallback] {
     return [options, cb];
 }
 
+/**
+ * The URL a NUI page uses to reach this resource's own client script.
+ *
+ * `https`, not `http`: the CEF page is served over https, so an http target is a mixed-content
+ * request and the browser blocks it before it leaves the page. The screenshot is taken and then
+ * posted into the void, which from the outside is indistinguishable from a capture that never
+ * happened — every entry point simply never calls back.
+ */
+function nuiCallbackUrl(callbackName: string) {
+    return `//${GetCurrentResourceName()}/${callbackName}`;
+}
+
 function requestScreenshot(options: any, cb: ResultCallback) {
     const [realOptions, realCb] = normalize(options, cb);
     const request = toRequest(realOptions);
 
     request.resultURL = null;
     request.targetField = null;
-    request.targetURL = `http://${GetCurrentResourceName()}/screenshot_created`;
+    request.targetURL = nuiCallbackUrl('screenshot_created');
 
     sendRequest(request, realCb);
 }
@@ -125,7 +120,7 @@ function requestScreenshotUpload(url: string, field: string, options: any, cb: R
 
     request.targetURL = url;
     request.targetField = field;
-    request.resultURL = `http://${GetCurrentResourceName()}/screenshot_created`;
+    request.resultURL = nuiCallbackUrl('screenshot_created');
 
     sendRequest(request, realCb);
 }
@@ -168,7 +163,7 @@ on(
 onNet('screenshot_basic:requestScreenshot', (options: any, url: string) => {
     const request = toRequest(options);
 
-    request.targetURL = `http://${GetCurrentServerEndpoint()}${url}`;
+    request.targetURL = `//${GetCurrentServerEndpoint()}${url}`;
     request.targetField = 'file';
     request.resultURL = null;
 

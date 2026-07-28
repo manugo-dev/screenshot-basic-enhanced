@@ -6,6 +6,7 @@ import Router from '@koa/router';
 import { koaBody } from 'koa-body';
 import type { File } from 'formidable';
 import { v4 } from 'uuid';
+import { registerExport } from '../shared/export';
 
 const app = new Koa();
 const router = new Router();
@@ -93,26 +94,24 @@ app.use(
 
 setHttpCallback(app.callback());
 
-// Cfx stuff.
-// Read off the global on purpose: this file is bundled as CommonJS, so a bare
-// `exports` would resolve to the module's own exports object, not Cfx's.
-const exp = (globalThis as any).exports;
+registerExport(
+    'requestClientScreenshot',
+    (player: string | number, options: any, cb: UploadCallback) => {
+        const tkn = v4();
 
-exp('requestClientScreenshot', (player: string | number, options: any, cb: UploadCallback) => {
-    const tkn = v4();
+        const fileName = options.fileName;
+        delete options['fileName']; // so the client won't get to know this
 
-    const fileName = options.fileName;
-    delete options['fileName']; // so the client won't get to know this
+        uploads[tkn] = {
+            fileName,
+            cb,
+        };
 
-    uploads[tkn] = {
-        fileName,
-        cb,
-    };
-
-    emitNet(
-        'screenshot_basic:requestScreenshot',
-        player,
-        options,
-        `/${GetCurrentResourceName()}/upload/${tkn}`,
-    );
-});
+        emitNet(
+            'screenshot_basic:requestScreenshot',
+            player,
+            options,
+            `/${GetCurrentResourceName()}/upload/${tkn}`,
+        );
+    },
+);

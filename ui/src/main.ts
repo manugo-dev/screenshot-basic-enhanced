@@ -235,9 +235,33 @@ class ScreenshotUI {
                   id: request.correlation,
               });
 
-        this.upload(request, body).catch((err) => {
+        this.upload(request, body).catch(async (err) => {
             console.error('screenshot-basic: upload failed', err);
+            await this.reportFailure(request, err);
         });
+    }
+
+    /**
+     * Tell the client script why a capture never arrived.
+     *
+     * Without this a failed POST is a `console.error` in a hidden CEF frame, so the caller simply
+     * waits forever and every entry point looks equally broken. Reported over a relative URL, which
+     * is same-origin by construction and so cannot be blocked the way an absolute one can.
+     */
+    async reportFailure(request: ScreenshotRequest, err: any) {
+        try {
+            await fetch('/screenshot_error', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: request.correlation,
+                    error: String(err && err.message ? err.message : err),
+                    targetURL: request.targetURL,
+                }),
+            });
+        } catch (reportErr) {
+            console.error('screenshot-basic: could not report the failure either', reportErr);
+        }
     }
 
     async upload(request: ScreenshotRequest, body: FormData | string) {

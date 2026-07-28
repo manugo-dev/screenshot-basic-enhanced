@@ -58,6 +58,7 @@ module.exports = {
     output: {
         filename: 'ui.js',
         path: path.resolve(__dirname, 'dist'),
+        iife: false,
     },
     target: ['web', 'es2020'],
     performance: {

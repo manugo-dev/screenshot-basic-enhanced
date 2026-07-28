@@ -14,5 +14,5 @@
     "noImplicitAny": false,
     "strict": false
   },
-  "include": ["./**/*", "../shared/**/*"]
+  "include": ["./**/*"]
 }

@@ -29,6 +29,7 @@ module.exports = {
     output: {
         filename: 'server.js',
         path: path.resolve(__dirname, 'dist'),
+        iife: false,
     },
     // the server scripting runtime is Node-based; targeting node16 keeps the
     // emitted bundle compatible with both current and older FiveM builds
