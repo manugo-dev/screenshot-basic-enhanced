@@ -1,23 +1,40 @@
 import { setHttpCallback } from '@citizenfx/http-wrapper';
 
+import { promises as fs } from 'fs';
+import Koa from 'koa';
+import Router from '@koa/router';
+import { koaBody } from 'koa-body';
+import type { File } from 'formidable';
 import { v4 } from 'uuid';
-import * as fs from 'fs';
-import * as Koa from 'koa';
-import * as Router from 'koa-router';
-import * as koaBody from 'koa-body';
-import * as mv from 'mv';
-import { File } from 'formidable';
 
 const app = new Koa();
 const router = new Router();
 
-class UploadData {
-    fileName: string;
+type UploadCallback = (err: string | boolean, data: string | null) => void;
 
-    cb: (err: string | boolean, data: string) => void;
+interface UploadData {
+    fileName?: string;
+    cb: UploadCallback;
 }
 
 const uploads: { [token: string]: UploadData } = {};
+
+/**
+ * fs.rename fails with EXDEV when the target lives on another volume, which is
+ * common when a server points `fileName` at a different drive than the temp dir.
+ */
+async function moveFile(source: string, target: string) {
+    try {
+        await fs.rename(source, target);
+    } catch (err: any) {
+        if (err?.code !== 'EXDEV') {
+            throw err;
+        }
+
+        await fs.copyFile(source, target);
+        await fs.unlink(source);
+    }
+}
 
 router.post('/upload/:token', async (ctx) => {
     const tkn: string = ctx.params['token'];
@@ -25,63 +42,63 @@ router.post('/upload/:token', async (ctx) => {
     ctx.response.append('Access-Control-Allow-Origin', '*');
     ctx.response.append('Access-Control-Allow-Methods', 'GET, POST');
 
-    if (uploads[tkn] !== undefined) {
-        const upload = uploads[tkn];
-        delete uploads[tkn];
+    const upload = uploads[tkn];
 
-        const finish = (err: string, data: string) => {
-            setImmediate(() => {
-                upload.cb(err || false, data);
-            });
-        }
-
-        const f = ctx.request.files['file'] as File;
-
-        if (f) {
-            if (upload.fileName) {
-                mv(f.path, upload.fileName, (err) => {
-                    if (err) {
-                        finish(err.message, null);
-                        return;
-                    }
-
-                    finish(null, upload.fileName);
-                });
-            } else {
-                fs.readFile(f.path, (err, data) => {
-                    if (err) {
-                        finish(err.message, null);
-                        return;
-                    }
-
-                    fs.unlink(f.path, (err) => {
-                        finish(null, `data:${f.type};base64,${data.toString('base64')}`);
-                    });
-                });
-            }
-        }
-
-        ctx.body = { success: true };
-
+    if (upload === undefined) {
+        ctx.body = { success: false };
         return;
     }
 
-    ctx.body = { success: false };
+    delete uploads[tkn];
+
+    const finish = (err: string | null, data: string | null) => {
+        setImmediate(() => {
+            upload.cb(err || false, data);
+        });
+    };
+
+    // formidable v3 always hands back arrays for repeated fields
+    const uploaded = ctx.request.files?.['file'];
+    const f: File | undefined = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+
+    if (f) {
+        try {
+            if (upload.fileName) {
+                await moveFile(f.filepath, upload.fileName);
+                finish(null, upload.fileName);
+            } else {
+                const data = await fs.readFile(f.filepath);
+                await fs.unlink(f.filepath).catch(() => {});
+
+                finish(null, `data:${f.mimetype};base64,${data.toString('base64')}`);
+            }
+        } catch (err: any) {
+            finish(err?.message ?? String(err), null);
+        }
+    } else {
+        finish('no file was uploaded', null);
+    }
+
+    ctx.body = { success: true };
 });
 
-app.use(koaBody({
+app.use(
+    koaBody({
         patchKoa: true,
         multipart: true,
-    }))
-   .use(router.routes())
-   .use(router.allowedMethods());
+    }),
+)
+    .use(router.routes())
+    .use(router.allowedMethods());
 
 setHttpCallback(app.callback());
 
-// Cfx stuff
-const exp = (<any>global).exports;
+// Cfx stuff.
+// Read off the global on purpose: this file is bundled as CommonJS, so a bare
+// `exports` would resolve to the module's own exports object, not Cfx's.
+const exp = (globalThis as any).exports;
 
-exp('requestClientScreenshot', (player: string | number, options: any, cb: (err: string | boolean, data: string) => void) => {
+exp('requestClientScreenshot', (player: string | number, options: any, cb: UploadCallback) => {
     const tkn = v4();
 
     const fileName = options.fileName;
@@ -89,8 +106,13 @@ exp('requestClientScreenshot', (player: string | number, options: any, cb: (err:
 
     uploads[tkn] = {
         fileName,
-        cb
+        cb,
     };
 
-    emitNet('screenshot_basic:requestScreenshot', player, options, `/${GetCurrentResourceName()}/upload/${tkn}`);
+    emitNet(
+        'screenshot_basic:requestScreenshot',
+        player,
+        options,
+        `/${GetCurrentResourceName()}/upload/${tkn}`,
+    );
 });

@@ -1,18 +1,16 @@
 {
-    "compilerOptions": {
-        "outDir": "./",
-        "noImplicitAny": false,
-        "module": "es6",
-        "moduleResolution": "node",
-        "target": "es6",
-        "allowJs": true,
-        "lib": [
-            "es2016",
-            "dom"
-        ]
-    },
-    "include": [
-        "./**/*"
-    ],
-    "exclude": []
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2020", "dom", "dom.iterable"],
+    "types": [],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "strict": false
+  },
+  "include": ["./**/*"]
 }

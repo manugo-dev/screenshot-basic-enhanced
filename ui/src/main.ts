@@ -10,7 +10,7 @@ import {
     ShaderMaterial,
     PlaneBufferGeometry,
     Mesh,
-    WebGLRenderer
+    WebGLRenderer,
 } from '@citizenfx/three';
 
 class ScreenshotRequest {
@@ -29,16 +29,16 @@ class ScreenshotRequest {
 // from https://stackoverflow.com/a/12300351
 function dataURItoBlob(dataURI: string) {
     const byteString = atob(dataURI.split(',')[1]);
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
 
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
-  
+
     for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
     }
-  
-    const blob = new Blob([ab], {type: mimeString});
+
+    const blob = new Blob([ab], { type: mimeString });
     return blob;
 }
 
@@ -51,26 +51,37 @@ class ScreenshotUI {
     request: ScreenshotRequest;
 
     initialize() {
-        window.addEventListener('message', event => {
+        window.addEventListener('message', (event) => {
             this.request = event.data.request;
         });
 
-        window.addEventListener('resize', event => {
+        window.addEventListener('resize', () => {
             this.resize();
         });
 
-        const cameraRTT: any = new OrthographicCamera( window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, -10000, 10000 );
+        const cameraRTT: any = new OrthographicCamera(
+            window.innerWidth / -2,
+            window.innerWidth / 2,
+            window.innerHeight / 2,
+            window.innerHeight / -2,
+            -10000,
+            10000,
+        );
         cameraRTT.position.z = 100;
 
         const sceneRTT: any = new Scene();
 
-        const rtTexture = new WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: LinearFilter, magFilter: NearestFilter, format: RGBAFormat, type: UnsignedByteType } );
-        const gameTexture: any = new CfxTexture( );
+        const rtTexture = new WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+            minFilter: LinearFilter,
+            magFilter: NearestFilter,
+            format: RGBAFormat,
+            type: UnsignedByteType,
+        });
+        const gameTexture: any = new CfxTexture();
         gameTexture.needsUpdate = true;
 
-        const material = new ShaderMaterial( {
-
-            uniforms: { "tDiffuse": { value: gameTexture } },
+        const material = new ShaderMaterial({
+            uniforms: { tDiffuse: { value: gameTexture } },
             vertexShader: `
 			varying vec2 vUv;
 
@@ -86,20 +97,19 @@ class ScreenshotUI {
 			void main() {
 				gl_FragColor = texture2D( tDiffuse, vUv );
 			}
-`
-
-        } );
+`,
+        });
 
         this.material = material;
 
-        const plane = new PlaneBufferGeometry( window.innerWidth, window.innerHeight );
-        const quad: any = new Mesh( plane, material );
+        const plane = new PlaneBufferGeometry(window.innerWidth, window.innerHeight);
+        const quad: any = new Mesh(plane, material);
         quad.position.z = -100;
-        sceneRTT.add( quad );
+        sceneRTT.add(quad);
 
         const renderer = new WebGLRenderer();
-        renderer.setPixelRatio( window.devicePixelRatio );
-        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.autoClear = false;
 
         document.getElementById('app').appendChild(renderer.domElement);
@@ -110,32 +120,43 @@ class ScreenshotUI {
         this.sceneRTT = sceneRTT;
         this.cameraRTT = cameraRTT;
 
-        this.animate = this.animate.bind(this);
-
         requestAnimationFrame(this.animate);
     }
 
     resize() {
-        const cameraRTT: any = new OrthographicCamera( window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, -10000, 10000 );
+        const cameraRTT: any = new OrthographicCamera(
+            window.innerWidth / -2,
+            window.innerWidth / 2,
+            window.innerHeight / 2,
+            window.innerHeight / -2,
+            -10000,
+            10000,
+        );
         cameraRTT.position.z = 100;
 
         this.cameraRTT = cameraRTT;
 
         const sceneRTT: any = new Scene();
 
-        const plane = new PlaneBufferGeometry( window.innerWidth, window.innerHeight );
-        const quad: any = new Mesh( plane, this.material );
+        const plane = new PlaneBufferGeometry(window.innerWidth, window.innerHeight);
+        const quad: any = new Mesh(plane, this.material);
         quad.position.z = -100;
-        sceneRTT.add( quad );
+        sceneRTT.add(quad);
 
         this.sceneRTT = sceneRTT;
 
-        this.rtTexture = new WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: LinearFilter, magFilter: NearestFilter, format: RGBAFormat, type: UnsignedByteType } );
+        this.rtTexture = new WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+            minFilter: LinearFilter,
+            magFilter: NearestFilter,
+            format: RGBAFormat,
+            type: UnsignedByteType,
+        });
 
-        this.renderer.setSize( window.innerWidth, window.innerHeight );
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    animate() {
+    // arrow property so it stays bound when handed to requestAnimationFrame
+    animate = () => {
         requestAnimationFrame(this.animate);
 
         this.renderer.clear();
@@ -147,12 +168,19 @@ class ScreenshotUI {
 
             this.handleRequest(request);
         }
-    }
+    };
 
     handleRequest(request: ScreenshotRequest) {
         // read the screenshot
         const read = new Uint8Array(window.innerWidth * window.innerHeight * 4);
-        this.renderer.readRenderTargetPixels(this.rtTexture, 0, 0, window.innerWidth, window.innerHeight, read);
+        this.renderer.readRenderTargetPixels(
+            this.rtTexture,
+            0,
+            0,
+            window.innerWidth,
+            window.innerHeight,
+            read,
+        );
 
         // create a temporary canvas to compress the image
         const canvas = document.createElement('canvas');
@@ -190,34 +218,48 @@ class ScreenshotUI {
 
         const getFormData = () => {
             const formData = new FormData();
-            formData.append(request.targetField, dataURItoBlob(imageURL), `screenshot.${request.encoding}`);
+            formData.append(
+                request.targetField,
+                dataURItoBlob(imageURL),
+                `screenshot.${request.encoding}`,
+            );
 
             return formData;
         };
 
         // upload the image somewhere
-        fetch(request.targetURL, {
+        const body = request.targetField
+            ? getFormData()
+            : JSON.stringify({
+                  data: imageURL,
+                  id: request.correlation,
+              });
+
+        this.upload(request, body).catch((err) => {
+            console.error('screenshot-basic: upload failed', err);
+        });
+    }
+
+    async upload(request: ScreenshotRequest, body: FormData | string) {
+        const response = await fetch(request.targetURL, {
             method: 'POST',
             mode: 'cors',
             headers: request.headers,
-            body: (request.targetField) ? getFormData() : JSON.stringify({
-                data: imageURL,
-                id: request.correlation
-            })
-        })
-        .then(response => response.text())
-        .then(text => {
-            if (request.resultURL) {
-                fetch(request.resultURL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    body: JSON.stringify({
-                        data: text,
-                        id: request.correlation
-                    })
-                });
-            }
+            body,
         });
+
+        const text = await response.text();
+
+        if (request.resultURL) {
+            await fetch(request.resultURL, {
+                method: 'POST',
+                mode: 'cors',
+                body: JSON.stringify({
+                    data: text,
+                    id: request.correlation,
+                }),
+            });
+        }
     }
 }
 

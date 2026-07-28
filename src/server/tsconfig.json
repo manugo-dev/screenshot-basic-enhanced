@@ -1,20 +1,18 @@
 {
-    "compilerOptions": {
-        "baseUrl": ".",
-        "paths": { "*": ["types/*"] },
-        "outDir": "./",
-        "noImplicitAny": false,
-        "module": "es6",
-        "target": "es6",
-        "allowJs": true,
-        "lib": ["es2017"],
-        "types": ["@citizenfx/server", "@citizenfx/client", "node"],
-        "moduleResolution": "node"
-    },
-    "include": [
-        "./**/*"
-    ],
-    "exclude": [
-        
-    ]
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2020"],
+    // globals come from globals.d.ts so nothing is pulled in implicitly
+    "types": [],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "strict": false
+  },
+  "include": ["./**/*"]
 }
